@@ -1,0 +1,14 @@
+{
+  "type": "code",
+  "modid": "forgottenadmins",
+  "name": "ForgottenAdmins",
+  "authors": [
+    "KyCOK_KOTEuKu"
+  ],
+  "requiredOnClient": false,
+  "description": "Русская админ-панель для управления игроками, инвентарём, телепортацией, ролями и приватами.",
+  "version": "1.3.3",
+  "dependencies": {
+    "game": "1.22.2"
+  }
+}

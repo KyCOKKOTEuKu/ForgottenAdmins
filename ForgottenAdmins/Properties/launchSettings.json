@@ -1,0 +1,28 @@
+{
+  "profiles": {
+    "Client": {
+      "commandName": "Executable",
+      "executablePath": "$(VINTAGE_STORY_PRE)/Vintagestory",
+      "commandLineArgs": "--tracelog --addModPath $(ProjectDir)/bin/$(Configuration)/Mods --dataPath $(VINTAGE_STORY_DATA_MODDING)",
+      "workingDirectory": "$(VINTAGE_STORY_PRE)"
+    },
+    "Client_Flatworld": {
+      "commandName": "Executable",
+      "executablePath": "dotnet",
+      "commandLineArgs": "$(VINTAGE_STORY_PRE)/Vintagestory.dll --tracelog --addModPath $(ProjectDir)/bin/$(Configuration)/Mods --dataPath $(VINTAGE_STORY_DATA_MODDING) -o flatworld",
+      "workingDirectory": "$(VINTAGE_STORY_PRE)"
+    },
+    "Client_Jule": {
+      "commandName": "Executable",
+      "executablePath": "dotnet",
+      "commandLineArgs": "$(VINTAGE_STORY_PRE)/Vintagestory.dll --tracelog --addModPath $(ProjectDir)/bin/$(Configuration)/Mods --dataPath /home/dilli/.config/VintagestoryDataJule/",
+      "workingDirectory": "$(VINTAGE_STORY_PRE)"
+    },
+    "Server": {
+      "commandName": "Executable",
+      "executablePath": "dotnet",
+      "commandLineArgs": "$(VINTAGE_STORY_PRE)/VintagestoryServer.dll --tracelog --addModPath $(ProjectDir)/bin/$(Configuration)/Mods --dataPath $(VINTAGE_STORY_SERVER_DATA_MODDING)",
+      "workingDirectory": "$(VINTAGE_STORY_PRE)"
+    }
+  }
+}
