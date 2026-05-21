@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\\ForgottenAdmins\\ForgottenAdmins.csproj": {}
+    "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.5-gui-language\\ForgottenAdmins\\ForgottenAdmins.csproj": {}
   },
   "projects": {
-    "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\\ForgottenAdmins\\ForgottenAdmins.csproj": {
+    "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.5-gui-language\\ForgottenAdmins\\ForgottenAdmins.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\\ForgottenAdmins\\ForgottenAdmins.csproj",
+        "projectUniqueName": "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.5-gui-language\\ForgottenAdmins\\ForgottenAdmins.csproj",
         "projectName": "ForgottenAdmins",
-        "projectPath": "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\\ForgottenAdmins\\ForgottenAdmins.csproj",
+        "projectPath": "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.5-gui-language\\ForgottenAdmins\\ForgottenAdmins.csproj",
         "packagesPath": "C:\\Users\\wolki\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\\ForgottenAdmins\\obj\\",
+        "outputPath": "C:\\Users\\wolki\\OneDrive\\Desktop\\ForgottenAdmins-source-v1.4.5-gui-language\\ForgottenAdmins\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

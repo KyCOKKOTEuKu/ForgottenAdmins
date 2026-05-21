@@ -81,6 +81,40 @@ public class PlayerMenu : GuiDialog
 
     public override string ToggleKeyCombinationCode => "forgottenadminsplayermenu";
 
+
+    private string Tr(string ru, string en)
+    {
+        // Read Vintage Story's current language through reflection so the mod stays compatible
+        // even if the API member name differs between game versions.
+        var locale = string.Empty;
+        try
+        {
+            var langType = typeof(Lang);
+            locale = langType.GetProperty("CurrentLocale", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null)?.ToString()
+                     ?? langType.GetProperty("CurrentLanguage", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null)?.ToString()
+                     ?? langType.GetField("CurrentLocale", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null)?.ToString()
+                     ?? langType.GetField("CurrentLanguage", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)?.GetValue(null)?.ToString()
+                     ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(locale))
+            {
+                var settings = capi.GetType().GetProperty("Settings")?.GetValue(capi);
+                var stringSettings = settings?.GetType().GetProperty("String")?.GetValue(settings);
+                locale = stringSettings?.GetType().GetProperty("Item")?.GetValue(stringSettings, new object[] { "language" })?.ToString()
+                         ?? stringSettings?.GetType().GetMethod("Get")?.Invoke(stringSettings, new object[] { "language" })?.ToString()
+                         ?? string.Empty;
+            }
+        }
+        catch
+        {
+            locale = string.Empty;
+        }
+
+        return locale.StartsWith("ru", StringComparison.OrdinalIgnoreCase) ? ru : en;
+    }
+
+    private string NoSavedPointsText => Tr("Нет сохранённых точек", "No saved points");
+
     private static InventoryGeneric CreateEditableInventory(ICoreAPI api, string name, int slots)
     {
         // DummyInventory uses DummySlot, which is suitable for rendering only.
@@ -102,15 +136,15 @@ public class PlayerMenu : GuiDialog
         var tabBoundsL = ElementBounds.Fixed(-180, 25, 180, 700);
         var tabs = new[]
         {
-            new GuiTab { DataInt = 0, Name = "Инфо", PaddingTop = 10 },
-            new GuiTab { DataInt = 1, Name = "Действия", PaddingTop = 10 },
-            new GuiTab { DataInt = 2, Name = "Приваты", PaddingTop = 10 },
-            new GuiTab { DataInt = 3, Name = "Клиентские моды", PaddingTop = 10 }
+            new GuiTab { DataInt = 0, Name = Tr("Инфо", "Info"), PaddingTop = 10 },
+            new GuiTab { DataInt = 1, Name = Tr("Действия", "Actions"), PaddingTop = 10 },
+            new GuiTab { DataInt = 2, Name = Tr("Приваты", "Claims"), PaddingTop = 10 },
+            new GuiTab { DataInt = 3, Name = Tr("Клиентские моды", "Client mods"), PaddingTop = 10 }
         };
 
         PlayerMenuComposer = capi.Gui.CreateCompo("playerMenuDialog", dialogBounds)
             .AddShadedDialogBG(bgBounds)
-            .AddDialogTitleBar("Меню игрока", OnTitleBarCloseClicked)
+            .AddDialogTitleBar(Tr("Меню игрока", "Player menu"), OnTitleBarCloseClicked)
             .AddVerticalTabs(tabs, tabBoundsL, OnTabClicked, "verticalTabs");
 
         switch (_currentTabIndex)
@@ -157,7 +191,7 @@ public class PlayerMenu : GuiDialog
         _playerSearchFilter = string.Empty;
         PlayerListComposer = capi.Gui.CreateCompo("playerListDialog", dialogBoundsList)
             .AddShadedDialogBG(bgBoundsList)
-            .AddDialogTitleBar("Список игроков", OnTitleBarCloseClicked)
+            .AddDialogTitleBar(Tr("Список игроков", "Player list"), OnTitleBarCloseClicked)
             .AddTextInput(titleBounds = titleBounds.BelowCopy(10, 6).WithFixedSize(360, 30), OnSearchChanged, null, "playerSearch")
             .AddInset(bgBoundsList = titleBounds.BelowCopy(0, 3).WithFixedSize(
                 contentBoundsList.fixedWidth,
@@ -174,7 +208,7 @@ public class PlayerMenu : GuiDialog
         clippingBounds.CalcWorldBounds();
 
         var guiElementTextInput = PlayerListComposer.GetTextInput("playerSearch");
-        guiElementTextInput.SetPlaceHolderText(Lang.Get("Поиск..."));
+        guiElementTextInput.SetPlaceHolderText(Tr("Поиск...", "Search..."));
         guiElementTextInput.OnFocusLost();
         PlayerListComposer.GetScrollbar("scrollbar").SetHeights(
             (float)(clippingBounds.fixedHeight),
@@ -194,23 +228,23 @@ public class PlayerMenu : GuiDialog
 
         var y = 10;
         PlayerMenuComposer
-            .AddStaticText($"Клиентские моды: {playerName}", titleFont, ElementBounds.Fixed(15, y, 640, 28));
+            .AddStaticText($"{Tr("Клиентские моды", "Client mods")}: {playerName}", titleFont, ElementBounds.Fixed(15, y, 640, 28));
 
         y += 34;
         PlayerMenuComposer
-            .AddStaticText($"Всего модов: {mods.Count}", font, ElementBounds.Fixed(15, y, 300, 24));
+            .AddStaticText($"{Tr("Всего модов", "Total mods")}: {mods.Count}", font, ElementBounds.Fixed(15, y, 300, 24));
 
         y += 36;
         PlayerMenuComposer
             .AddStaticText("ModID", titleFont, ElementBounds.Fixed(15, y, 220, 24))
-            .AddStaticText("Название", titleFont, ElementBounds.Fixed(250, y, 360, 24))
-            .AddStaticText("Версия", titleFont, ElementBounds.Fixed(620, y, 140, 24));
+            .AddStaticText(Tr("Название", "Name"), titleFont, ElementBounds.Fixed(250, y, 360, 24))
+            .AddStaticText(Tr("Версия", "Version"), titleFont, ElementBounds.Fixed(620, y, 140, 24));
 
         y += 28;
         if (mods.Count == 0)
         {
             PlayerMenuComposer
-                .AddStaticText("Список модов ещё не получен. Игрок должен быть онлайн и иметь установленный ForgottenAdmins на клиенте.", font, ElementBounds.Fixed(15, y, 920, 60));
+                .AddStaticText(Tr("Список модов ещё не получен. Игрок должен быть онлайн и иметь установленный ForgottenAdmins на клиенте.", "The mod list has not been received yet. The player must be online and have ForgottenAdmins installed on the client."), font, ElementBounds.Fixed(15, y, 920, 60));
         }
         else
         {
@@ -225,7 +259,7 @@ public class PlayerMenu : GuiDialog
 
             if (mods.Count > 20)
             {
-                PlayerMenuComposer.AddStaticText($"...и ещё {mods.Count - 20}. Полный список записан в ModConfig/ForgottenAdmins/client-mods-log.json", font, ElementBounds.Fixed(15, y + 10, 900, 40));
+                PlayerMenuComposer.AddStaticText($"{Tr("...и ещё", "...and") } {mods.Count - 20}. {Tr("Полный список записан в ModConfig/ForgottenAdmins/client-mods-log.json", "The full list was written to ModConfig/ForgottenAdmins/client-mods-log.json")}", font, ElementBounds.Fixed(15, y + 10, 900, 40));
             }
         }
 
@@ -251,22 +285,22 @@ public class PlayerMenu : GuiDialog
       
         const int spacing = -2;
         PlayerMenuComposer
-            .AddStaticText("Игрок:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Игрок:", "Player:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText(ForgottenAdminsData?.PlayerName ?? "ERROR getting name" , font, rightDropDown = rightDropDown.BelowCopy().WithFixedHeight(30), "playername")
             .AddIf(LandClaims.Length > 0)
             .AddStaticText("Claims:", font, leftText = leftText.BelowCopy(0, spacing + 10))
             .AddDropDown(LandClaims, LandClaims, _selectedLandClaim, OnSelectionClaims,
                 rightDropDown = rightDropDown.BelowCopy(0, 10).WithFixedHeight(30), "claims")
-            .AddStaticText("Защита:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Защита:", "Protection:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText(SelectedClaim?.ProtectionLevel.ToString() ?? string.Empty, font,
                 rightDropDown = rightDropDown.BelowCopy(0, spacing2 - 3), "protection")
-            .AddStaticText("Зоны:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Зоны:", "Areas:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDropDown(SelectedAreas, SelectedAreas, 0, OnSelectionChangeVoid,
                 rightDropDown = rightDropDown.BelowCopy(0, 10).WithFixedHeight(30), "areas")
-            .AddStaticText("Допущенные:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Допущенные:", "Permitted:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDropDown(SelectedClaimPermittedPlayers, SelectedClaimPermittedPlayers, 0, OnSelectionChangeVoid,
                 rightDropDown = rightDropDown.BelowCopy(0, 10).WithFixedHeight(30), "permittedplayers")
-            .AddStaticText("Доступ всем:", font, leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Доступ всем:", "Public access:"), font, leftText.BelowCopy(0, spacing))
             .AddDynamicText(SelectedClaim?.AllowUseEveryone.ToString() ?? string.Empty, font,
                 rightDropDown.BelowCopy(0, spacing2 - 8), "allowuseeveryone")
             .EndIf();
@@ -351,7 +385,7 @@ public class PlayerMenu : GuiDialog
     private string[] CustomCoordNames()
     {
         var list = ForgottenAdminsData?.CustomCoordinates;
-        if (list == null || list.Count == 0) return new[] { "Нет сохранённых точек" };
+        if (list == null || list.Count == 0) return new[] { NoSavedPointsText };
         return list.Select(c => c.Name).ToArray();
     }
 
@@ -404,7 +438,7 @@ public class PlayerMenu : GuiDialog
     {
         if (ForgottenAdminsData?.Position == null) return true;
 
-        var name = string.IsNullOrWhiteSpace(_customCoordName) ? $"Позиция игрока {DateTime.Now:HH-mm-ss}" : _customCoordName.Trim();
+        var name = string.IsNullOrWhiteSpace(_customCoordName) ? $"{Tr("Позиция игрока", "Player position")} {DateTime.Now:HH-mm-ss}" : _customCoordName.Trim();
         _selectedCustomCoordName = name;
 
         var pos = ForgottenAdminsData.Position;
@@ -420,21 +454,21 @@ public class PlayerMenu : GuiDialog
     private bool OnDeleteCustomCoordClick()
     {
         var name = CurrentCoordName();
-        if (name == "Нет сохранённых точек") return true;
+        if (name == NoSavedPointsText) return true;
         return SendAction("delcoord", EscapePacket(name));
     }
 
     private bool OnTpMeToCustomCoordClick()
     {
         var name = CurrentCoordName();
-        if (name == "Нет сохранённых точек") return true;
+        if (name == NoSavedPointsText) return true;
         return SendAction("tpme", EscapePacket(name));
     }
 
     private bool OnTpPlayerToCustomCoordClick()
     {
         var name = CurrentCoordName();
-        if (name == "Нет сохранённых точек") return true;
+        if (name == NoSavedPointsText) return true;
         return SendAction("tpplayer", EscapePacket(name));
     }
 
@@ -453,42 +487,42 @@ public class PlayerMenu : GuiDialog
         const int spacing = -2;
         var gameModes = Enum.GetNames(typeof(EnumGameMode));
         var roleIndex = ForgottenAdminsServerData?.Roles.IndexOf(ForgottenAdminsData?.Role) ?? 0;
-        PlayerMenuComposer.AddStaticText("Игрок:", font, leftText = leftText.BelowCopy(0, spacing))
+        PlayerMenuComposer.AddStaticText(Tr("Игрок:", "Player:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText(ForgottenAdminsData?.PlayerName ?? "ERROR getting name" , font, rightDropDown = rightDropDown.BelowCopy().WithFixedHeight(30), "playername")
-            .AddStaticText("Режим:", font, leftText = leftText.BelowCopy(0, spacing + 10))
+            .AddStaticText(Tr("Режим:", "Mode:"), font, leftText = leftText.BelowCopy(0, spacing + 10))
             .AddDropDown(gameModes, gameModes, (int)(ForgottenAdminsData?.CurrentGameMode ?? EnumGameMode.Survival), OnSelectionChangeVoid,
                 rightDropDown = rightDropDown.BelowCopy(0, 10).WithFixedHeight(30), "gamemodes");
         var buttonBounds = ElementBounds.Fixed(rightDropDown.fixedX + rightDropDown.fixedWidth,
             rightDropDown.fixedY, 100, 20);
         PlayerMenuComposer
-            .AddButton("ОК", OnSetGameMode, buttonBounds = buttonBounds.BelowCopy(10, -20), fontBtn);
+            .AddButton(Tr("ОК", "OK"), OnSetGameMode, buttonBounds = buttonBounds.BelowCopy(10, -20), fontBtn);
 
         PlayerMenuComposer
-            .AddStaticText("Роль:", font, leftText = leftText.BelowCopy())
+            .AddStaticText(Tr("Роль:", "Role:"), font, leftText = leftText.BelowCopy())
             .AddDropDown(ForgottenAdminsServerData?.Roles, ForgottenAdminsServerData?.Roles, roleIndex, OnSelectionChangeVoid,
                 rightDropDown = rightDropDown.BelowCopy(0, 10).WithFixedHeight(30), "roles");
         PlayerMenuComposer
-            .AddButton("ОК", OnRoleSet, buttonBounds = buttonBounds.BelowCopy(0, 20), fontBtn);
+            .AddButton(Tr("ОК", "OK"), OnRoleSet, buttonBounds = buttonBounds.BelowCopy(0, 20), fontBtn);
 
         PlayerMenuComposer
-            .AddStaticText("Доп. приваты:", font, leftText = leftText.BelowCopy())
+            .AddStaticText(Tr("Доп. приваты:", "Extra claims:"), font, leftText = leftText.BelowCopy())
             .AddHoverText(
                 "player specific extra land claim allowance, independent of the allowance set by the role. (default: 0)",
                 font, 600, leftText)
             .AddNumberInput(rightDropDown = rightDropDown.BelowCopy(0, 10).WithFixedHeight(30), OnTextChanged,
                 key: "landclaimallowance");
         PlayerMenuComposer
-            .AddButton("ОК", OnSetLandClaimAllowance, buttonBounds = buttonBounds.BelowCopy(0, 20), fontBtn);
+            .AddButton(Tr("ОК", "OK"), OnSetLandClaimAllowance, buttonBounds = buttonBounds.BelowCopy(0, 20), fontBtn);
 
         PlayerMenuComposer
-            .AddStaticText("Доп. зоны:", font, leftText = leftText.BelowCopy())
+            .AddStaticText(Tr("Доп. зоны:", "Extra areas:"), font, leftText = leftText.BelowCopy())
             .AddHoverText(
                 "player specific extra land claim max areas, independent of the max areas set by the role. (default: 0)",
                 font, 600, leftText)
             .AddNumberInput(rightDropDown.BelowCopy(0, 10).WithFixedHeight(30), OnTextChanged,
                 key: "landclaimmaxareas");
         PlayerMenuComposer
-            .AddButton("ОК", OnSetLandClaimMaxAreas, buttonBounds.BelowCopy(0, 20), fontBtn);
+            .AddButton(Tr("ОК", "OK"), OnSetLandClaimMaxAreas, buttonBounds.BelowCopy(0, 20), fontBtn);
 
 
         leftText = leftText.BelowCopy(0, 30);
@@ -496,19 +530,19 @@ public class PlayerMenu : GuiDialog
         var buttonBounds2 = ElementBounds.Fixed(15, leftText.fixedY, 100, 20);
         var buttonBounds3 = ElementBounds.Fixed(15, leftText.fixedY + 40, 100, 20);
         PlayerMenuComposer
-            .AddButton("Бан", OnBanClick, buttonBounds2.FlatCopy(), fontBtn)
-            .AddButton("Кик", OnKickClick, buttonBounds2 = buttonBounds2.RightCopy(10), fontBtn)
-            .AddButton("К игроку", OnTpToPlayerClick, buttonBounds2 = buttonBounds2.RightCopy(20), fontBtn)
+            .AddButton(Tr("Бан", "Ban"), OnBanClick, buttonBounds2.FlatCopy(), fontBtn)
+            .AddButton(Tr("Кик", "Kick"), OnKickClick, buttonBounds2 = buttonBounds2.RightCopy(10), fontBtn)
+            .AddButton(Tr("К игроку", "To player"), OnTpToPlayerClick, buttonBounds2 = buttonBounds2.RightCopy(20), fontBtn)
             .AddHoverText("Teleport to selected player", font, 300,
                 buttonBounds2)
-            .AddButton("К себе", OnTpPlayerToMeClick, buttonBounds2 = buttonBounds2.RightCopy(10), fontBtn)
-            .AddHoverText("Телепортировать выбранного игрока к себе", font, 300,
+            .AddButton(Tr("К себе", "To me"), OnTpPlayerToMeClick, buttonBounds2 = buttonBounds2.RightCopy(10), fontBtn)
+            .AddHoverText(Tr("Телепортировать выбранного игрока к себе", "Teleport selected player to you"), font, 300,
                 buttonBounds2)
-            .AddButton("Спавн я", OnSpawnMeClick, buttonBounds3 = buttonBounds3.FlatCopy(), fontBtn)
-            .AddHoverText("Телепортировать администратора на спавн", font, 300, buttonBounds3)
-            .AddButton("Спавн игрок", OnSpawnPlayerClick, buttonBounds3 = buttonBounds3.RightCopy(10), fontBtn)
-            .AddHoverText("Телепортировать выбранного игрока на спавн", font, 300, buttonBounds3)
-            .AddButton("Класс", OnCharSelClick, buttonBounds3 = buttonBounds3.RightCopy(10), fontBtn)
+            .AddButton(Tr("Спавн я", "Me spawn"), OnSpawnMeClick, buttonBounds3 = buttonBounds3.FlatCopy(), fontBtn)
+            .AddHoverText(Tr("Телепортировать администратора на спавн", "Teleport administrator to spawn"), font, 300, buttonBounds3)
+            .AddButton(Tr("Спавн игрок", "Player spawn"), OnSpawnPlayerClick, buttonBounds3 = buttonBounds3.RightCopy(10), fontBtn)
+            .AddHoverText(Tr("Телепортировать выбранного игрока на спавн", "Teleport selected player to spawn"), font, 300, buttonBounds3)
+            .AddButton(Tr("Класс", "Class"), OnCharSelClick, buttonBounds3 = buttonBounds3.RightCopy(10), fontBtn)
             .AddHoverText("Allows the player to re-select their class after doing so already.", font, 300,
                 buttonBounds3)
             ;
@@ -520,45 +554,45 @@ public class PlayerMenu : GuiDialog
         var coordDropBounds = ElementBounds.Fixed(455, sectionY + 2, 300, 28);
         var coordButtonBounds = ElementBounds.Fixed(180, sectionY + 42, 150, 25);
         PlayerMenuComposer
-            .AddStaticText("Имя точки:", font, coordLabelBounds)
+            .AddStaticText(Tr("Имя точки:", "Point name:"), font, coordLabelBounds)
             .AddTextInput(coordInputBounds, OnCoordNameChanged, null, "customcoordname")
             .AddDropDown(coords, coords, Math.Max(0, Array.IndexOf(coords, CurrentCoordName())), OnCustomCoordSelected, coordDropBounds, "customcoords")
-            .AddButton("Сохранить позицию игрока", OnSaveCustomCoordClick, coordButtonBounds.FlatCopy().WithFixedWidth(190), fontBtn)
-            .AddButton("Я → точка", OnTpMeToCustomCoordClick, coordButtonBounds = ElementBounds.Fixed(380, sectionY + 42, 120, 25), fontBtn)
-            .AddButton("Игрок → точка", OnTpPlayerToCustomCoordClick, coordButtonBounds = ElementBounds.Fixed(510, sectionY + 42, 145, 25), fontBtn)
-            .AddButton("Удалить", OnDeleteCustomCoordClick, coordButtonBounds = ElementBounds.Fixed(665, sectionY + 42, 90, 25), fontBtn)
-            .AddHoverText("Сохраняет текущую позицию выбранного игрока. Ручной ввод координат больше не используется: вводится только имя точки.", font, 620, coordLabelBounds);
+            .AddButton(Tr("Сохранить позицию игрока", "Save player position"), OnSaveCustomCoordClick, coordButtonBounds.FlatCopy().WithFixedWidth(190), fontBtn)
+            .AddButton(Tr("Я → точка", "Me → point"), OnTpMeToCustomCoordClick, coordButtonBounds = ElementBounds.Fixed(380, sectionY + 42, 120, 25), fontBtn)
+            .AddButton(Tr("Игрок → точка", "Player → point"), OnTpPlayerToCustomCoordClick, coordButtonBounds = ElementBounds.Fixed(510, sectionY + 42, 145, 25), fontBtn)
+            .AddButton(Tr("Удалить", "Delete"), OnDeleteCustomCoordClick, coordButtonBounds = ElementBounds.Fixed(665, sectionY + 42, 90, 25), fontBtn)
+            .AddHoverText(Tr("Сохраняет текущую позицию выбранного игрока. Ручной ввод координат больше не используется: вводится только имя точки.", "Saves the selected player current position. Manual coordinate input is no longer used: enter only the point name."), font, 620, coordLabelBounds);
 
         var effY = sectionY + 90;
         var effLabel = ElementBounds.Fixed(15, effY, 160, 28);
         var effInput = ElementBounds.Fixed(180, effY + 2, 110, 25);
         var effButton = ElementBounds.Fixed(305, effY, 80, 25);
         PlayerMenuComposer
-            .AddStaticText("Здоровье:", font, effLabel.FlatCopy())
+            .AddStaticText(Tr("Здоровье:", "Health:"), font, effLabel.FlatCopy())
             .AddNumberInput(effInput.FlatCopy(), OnTextChanged, key: "effecthealth")
-            .AddButton("ОК", OnSetHealthClick, effButton.FlatCopy(), fontBtn)
-            .AddStaticText("Голод/сытость:", font, effLabel = effLabel.BelowCopy(0, 12))
+            .AddButton(Tr("ОК", "OK"), OnSetHealthClick, effButton.FlatCopy(), fontBtn)
+            .AddStaticText(Tr("Голод/сытость:", "Hunger/saturation:"), font, effLabel = effLabel.BelowCopy(0, 12))
             .AddNumberInput(effInput = effInput.BelowCopy(0, 12), OnTextChanged, key: "effectsaturation")
-            .AddButton("ОК", OnSetSaturationClick, effButton = effButton.BelowCopy(0, 12), fontBtn)
-            .AddStaticText("Опьянение:", font, effLabel = effLabel.BelowCopy(0, 12))
+            .AddButton(Tr("ОК", "OK"), OnSetSaturationClick, effButton = effButton.BelowCopy(0, 12), fontBtn)
+            .AddStaticText(Tr("Опьянение:", "Drunk:"), font, effLabel = effLabel.BelowCopy(0, 12))
             .AddNumberInput(effInput = effInput.BelowCopy(0, 12), OnTextChanged, key: "effectdrunk")
-            .AddButton("ОК", OnSetDrunkClick, effButton = effButton.BelowCopy(0, 12), fontBtn)
-            .AddStaticText("Темп. тела:", font, effLabel = effLabel.BelowCopy(0, 12))
+            .AddButton(Tr("ОК", "OK"), OnSetDrunkClick, effButton = effButton.BelowCopy(0, 12), fontBtn)
+            .AddStaticText(Tr("Темп. тела:", "Body temp:"), font, effLabel = effLabel.BelowCopy(0, 12))
             .AddNumberInput(effInput = effInput.BelowCopy(0, 12), OnTextChanged, key: "effectbodytemp")
-            .AddButton("ОК", OnSetBodyTempClick, effButton = effButton.BelowCopy(0, 12), fontBtn)
-            .AddHoverText("Изменение здоровья, сытости, уровня опьянения и температуры тела применяется к выбранному игроку серверной частью мода.", font, 520, effLabel);
+            .AddButton(Tr("ОК", "OK"), OnSetBodyTempClick, effButton = effButton.BelowCopy(0, 12), fontBtn)
+            .AddHoverText(Tr("Изменение здоровья, сытости, уровня опьянения и температуры тела применяется к выбранному игроку серверной частью мода.", "Health, saturation, drunk level and body temperature changes are applied to the selected player by the server side of the mod."), font, 520, effLabel);
 
         var leftText2 = ElementBounds.Fixed(15, effY + 185, 105, 40);
         var rightDropDown2 = ElementBounds.Fixed(120, leftText2.fixedY + 10, 220, 20);
         PlayerMenuComposer
-            .AddStaticText("Назад:", font, leftText2 = leftText2.BelowCopy())
+            .AddStaticText(Tr("Назад:", "Back:"), font, leftText2 = leftText2.BelowCopy())
             .AddHoverText("When first opened this position is saved so you can TP here. Use set to update to current position.",font , 300, leftText2)
             .AddDynamicText(GetPosString(_backPosition), font, rightDropDown2 = rightDropDown2.BelowCopy(0, 10).WithFixedHeight(30),
                 key: "tpbackpos");
         var buttonBounds4 = ElementBounds.Fixed(buttonBounds.fixedX - buttonBounds.fixedWidth, rightDropDown2.fixedY, 100, 20);
         PlayerMenuComposer
-            .AddButton("ОК", OnTpBackSet, buttonBounds4 = buttonBounds4.RightCopy(), fontBtn)
-            .AddButton("ТП назад", OnTpBack, buttonBounds4.RightCopy(10), fontBtn);
+            .AddButton(Tr("ОК", "OK"), OnTpBackSet, buttonBounds4 = buttonBounds4.RightCopy(), fontBtn)
+            .AddButton(Tr("ТП назад", "TP back"), OnTpBack, buttonBounds4.RightCopy(10), fontBtn);
 
         PlayerMenuComposer.Compose();
 
@@ -658,7 +692,7 @@ public class PlayerMenu : GuiDialog
 
         var font = CairoFont.WhiteSmallishText();
 
-        PlayerMenuComposer.AddStaticText("Игрок:", font, leftText = leftText.BelowCopy(0, spacing))
+        PlayerMenuComposer.AddStaticText(Tr("Игрок:", "Player:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText(ForgottenAdminsData?.PlayerName ?? "ERROR getting name" , font, rightDropDown = rightDropDown.BelowCopy().WithFixedHeight(30), "playername")
             .AddStaticText("GM / FM / NC:", font, leftText = leftText.BelowCopy(0, spacing), "gmt")
             ;
@@ -668,35 +702,35 @@ public class PlayerMenu : GuiDialog
             ;
         PlayerMenuComposer.AddHoverText("Gamemod / FreeMove / NoClip", font, 300, leftText)
             ;
-        PlayerMenuComposer.AddStaticText("Права:", font, leftText = leftText.BelowCopy(0, spacing))
+        PlayerMenuComposer.AddStaticText(Tr("Права:", "Privileges:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDropDown(ForgottenAdminsData?.Privileges, ForgottenAdminsData?.Privileges, 0,
                 OnSelectionChangeVoid,
                 rightDropDown = rightDropDown.BelowCopy(0, spacing2 - 10), "privileges")
             .AddStaticText("UID:", font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText(ForgottenAdminsData?.PlayerUid, font,
                 rightDropDown = rightDropDown.BelowCopy(0, spacing2 - 3), "uid")
-            .AddStaticText("Здоровье:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Здоровье:", "Health:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText($"{ForgottenAdminsData?.Health} / {ForgottenAdminsData?.MaxHealth}", font,
                 rightDropDown = rightDropDown.BelowCopy(0, spacing2 - 8), "health")
-            .AddStaticText("Сытость:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Сытость:", "Saturation:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText($"{ForgottenAdminsData?.Saturation} / {ForgottenAdminsData?.MaxSaturation}", font,
                 rightDropDown = rightDropDown.BelowCopy(0, spacing2 - 5), "hunger")
-            .AddStaticText("Поз. / скорость:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Поз. / скорость:", "Pos. / speed:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText(GetPosString(ForgottenAdminsData?.Position) + " / " + ForgottenAdminsData?.MoveSpeedMultiplier, font,
                 rightDropDown = rightDropDown.BelowCopy(0, spacing2 - 8).WithFixedWidth(600), "pos")
             .AddHoverText("Position / MoveSpeed", font, 300, leftText)
-            .AddStaticText("Класс:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Класс:", "Class:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText(ForgottenAdminsData?.Class, font,
                 rightDropDown = rightDropDown.BelowCopy(0, spacing2 - 8).WithFixedWidth(600), "class")
-            .AddStaticText("Роль:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Роль:", "Role:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddDynamicText(ForgottenAdminsData?.Role, font,
                 rightDropDown = rightDropDown.BelowCopy(0, spacing2 - 8).WithFixedWidth(600), "role")
-            .AddStaticText("Респавн:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Респавн:", "Respawn:"), font, leftText = leftText.BelowCopy(0, spacing))
             .AddHoverText("Respawn uses left if set (99 usually means none is set)", font, 300, leftText)
             .AddDynamicText(ForgottenAdminsData?.RespawnUses.ToString(), font,
                 rightDropDown.BelowCopy(0, spacing2 - 8).WithFixedWidth(600), "respawn")
-            .AddStaticText("Инвентарь:", font, leftText = leftText.BelowCopy(0, spacing))
-            .AddStaticText("Можно перетаскивать предметы между слотами. Изменения сразу отправляются на сервер.", font, ElementBounds.Fixed(15, 635, 760, 24));
+            .AddStaticText(Tr("Инвентарь:", "Inventory:"), font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText(Tr("Можно перетаскивать предметы между слотами. Изменения сразу отправляются на сервер.", "You can drag items between slots. Changes are sent to the server immediately."), font, ElementBounds.Fixed(15, 635, 760, 24));
 
         leftText = leftText.BelowCopy();
 
