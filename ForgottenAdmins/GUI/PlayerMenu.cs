@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cairo;
 using ForgottenAdmins.Data;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -54,14 +55,14 @@ public class PlayerMenu : GuiDialog
     public List<SavegameCellEntry> PlayerListCells;
     public Dictionary<string, string> PlayerListFull;
 
-    public DummyInventory HotBarInventory { get; set; }
-    public DummyInventory BackpackInventory { get; set; }
+    public IInventory HotBarInventory { get; set; }
+    public IInventory BackpackInventory { get; set; }
 
-    public DummyInventory MouseInventory { get; set; }
+    public IInventory MouseInventory { get; set; }
 
-    public DummyInventory CharacterInventory { get; set; }
+    public IInventory CharacterInventory { get; set; }
 
-    public DummyInventory CraftingInventory { get; set; }
+    public IInventory CraftingInventory { get; set; }
 
 
     public PlayerMenu(ICoreClientAPI capi, IClientNetworkChannel clientNetworkChannel) : base(capi)
@@ -70,15 +71,24 @@ public class PlayerMenu : GuiDialog
         PlayerUid = string.Empty;
         SelectedAreas = new[] { string.Empty };
 
-        HotBarInventory = new DummyInventory(capi, 12);
-        BackpackInventory = new DummyInventory(capi, 4);
+        HotBarInventory = CreateEditableInventory(capi, "hotbar", 12);
+        BackpackInventory = CreateEditableInventory(capi, "backpack", 4);
 
-        CraftingInventory = new DummyInventory(capi, 10);
-        CharacterInventory = new DummyInventory(capi, 15);
-        MouseInventory = new DummyInventory(capi);
+        CraftingInventory = CreateEditableInventory(capi, "crafting", 10);
+        CharacterInventory = CreateEditableInventory(capi, "character", 15);
+        MouseInventory = CreateEditableInventory(capi, "mouse", 1);
     }
 
     public override string ToggleKeyCombinationCode => "forgottenadminsplayermenu";
+
+    private static InventoryGeneric CreateEditableInventory(ICoreAPI api, string name, int slots)
+    {
+        // DummyInventory uses DummySlot, which is suitable for rendering only.
+        // InventoryGeneric creates normal mutable ItemSlot instances, so GuiElementItemSlotGrid
+        // can pick up, place and swap stacks with the player's cursor slot.
+        return new InventoryGeneric(slots, "forgottenadmins-" + name, Guid.NewGuid().ToString("N"), api);
+    }
+
 
     private void SetupDialog()
     {
@@ -94,7 +104,8 @@ public class PlayerMenu : GuiDialog
         {
             new GuiTab { DataInt = 0, Name = "Инфо", PaddingTop = 10 },
             new GuiTab { DataInt = 1, Name = "Действия", PaddingTop = 10 },
-            new GuiTab { DataInt = 2, Name = "Приваты", PaddingTop = 10 }
+            new GuiTab { DataInt = 2, Name = "Приваты", PaddingTop = 10 },
+            new GuiTab { DataInt = 3, Name = "Клиентские моды", PaddingTop = 10 }
         };
 
         PlayerMenuComposer = capi.Gui.CreateCompo("playerMenuDialog", dialogBounds)
@@ -117,6 +128,11 @@ public class PlayerMenu : GuiDialog
             case 2:
             {
                 ComposeClaims();
+                break;
+            }
+            case 3:
+            {
+                ComposeClientMods();
                 break;
             }
             default:
@@ -166,6 +182,54 @@ public class PlayerMenu : GuiDialog
         );
 
         PlayerMenuComposer.GetVerticalTab("verticalTabs").SetValue(_currentTabIndex, false);
+    }
+
+
+    private void ComposeClientMods()
+    {
+        var font = CairoFont.WhiteSmallishText();
+        var titleFont = CairoFont.WhiteSmallText().WithWeight(Cairo.FontWeight.Bold);
+        var playerName = ForgottenAdminsData?.PlayerName ?? "unknown";
+        var mods = ForgottenAdminsData?.ClientMods ?? new List<ForgottenAdminsClientModInfo>();
+
+        var y = 10;
+        PlayerMenuComposer
+            .AddStaticText($"Клиентские моды: {playerName}", titleFont, ElementBounds.Fixed(15, y, 640, 28));
+
+        y += 34;
+        PlayerMenuComposer
+            .AddStaticText($"Всего модов: {mods.Count}", font, ElementBounds.Fixed(15, y, 300, 24));
+
+        y += 36;
+        PlayerMenuComposer
+            .AddStaticText("ModID", titleFont, ElementBounds.Fixed(15, y, 220, 24))
+            .AddStaticText("Название", titleFont, ElementBounds.Fixed(250, y, 360, 24))
+            .AddStaticText("Версия", titleFont, ElementBounds.Fixed(620, y, 140, 24));
+
+        y += 28;
+        if (mods.Count == 0)
+        {
+            PlayerMenuComposer
+                .AddStaticText("Список модов ещё не получен. Игрок должен быть онлайн и иметь установленный ForgottenAdmins на клиенте.", font, ElementBounds.Fixed(15, y, 920, 60));
+        }
+        else
+        {
+            foreach (var mod in mods.Take(20))
+            {
+                PlayerMenuComposer
+                    .AddStaticText(mod.ModId ?? string.Empty, font, ElementBounds.Fixed(15, y, 220, 22))
+                    .AddStaticText(mod.Name ?? string.Empty, font, ElementBounds.Fixed(250, y, 360, 22))
+                    .AddStaticText(mod.Version ?? string.Empty, font, ElementBounds.Fixed(620, y, 140, 22));
+                y += 24;
+            }
+
+            if (mods.Count > 20)
+            {
+                PlayerMenuComposer.AddStaticText($"...и ещё {mods.Count - 20}. Полный список записан в ModConfig/ForgottenAdmins/client-mods-log.json", font, ElementBounds.Fixed(15, y + 10, 900, 40));
+            }
+        }
+
+        PlayerMenuComposer.Compose();
     }
 
     private void ComposeClaims()
@@ -584,7 +648,7 @@ public class PlayerMenu : GuiDialog
         var backpackBounds = ElementStdBounds.SlotGrid(EnumDialogArea.RightFixed, -180, 0, 4, 1)
             .WithFixedAlignmentOffset(-10, 0);
 
-        var rows = BackpackInventory.Slots != null ? (int)Math.Ceiling(BackpackInventory.Slots.Length / 6f) : 0;
+        var rows = BackpackInventory.Count > 0 ? (int)Math.Ceiling(BackpackInventory.Count / 6f) : 0;
 
         const double pad = 3.0;
         var craftingGridBounds = ElementStdBounds.SlotGrid(EnumDialogArea.RightFixed, -292, 50, 3, 3);
@@ -631,7 +695,8 @@ public class PlayerMenu : GuiDialog
             .AddHoverText("Respawn uses left if set (99 usually means none is set)", font, 300, leftText)
             .AddDynamicText(ForgottenAdminsData?.RespawnUses.ToString(), font,
                 rightDropDown.BelowCopy(0, spacing2 - 8).WithFixedWidth(600), "respawn")
-            .AddStaticText("Инвентарь:", font, leftText = leftText.BelowCopy(0, spacing));
+            .AddStaticText("Инвентарь:", font, leftText = leftText.BelowCopy(0, spacing))
+            .AddStaticText("Можно перетаскивать предметы между слотами. Изменения сразу отправляются на сервер.", font, ElementBounds.Fixed(15, 635, 760, 24));
 
         leftText = leftText.BelowCopy();
 
@@ -813,7 +878,7 @@ public class PlayerMenu : GuiDialog
 
     private static bool CanClickSlot(int slotId)
     {
-        return false;
+        return true;
     }
 
     private bool OnTpToPlayerClick()
@@ -828,8 +893,56 @@ public class PlayerMenu : GuiDialog
         return true;
     }
 
-    private static void SendInvPacket(object obj)
+    private void SendInvPacket(object obj)
     {
+        if (ForgottenAdminsData?.PlayerUid == null) return;
+
+        // GuiElementItemSlotGrid performs click/drag operations through the local player's
+        // real mouse cursor slot. If we only send the visible target inventories here, a
+        // picked-up stack has already been removed from the target slot but is not present
+        // in our preview MouseInventory yet. The server then receives an empty source slot
+        // and the item looks like it disappeared.
+        //
+        // Before sending the edit packet, mirror the local cursor slot into the preview
+        // mouse inventory. On the server this is applied to the target player's mouse cursor
+        // inventory, so the stack survives the first click and can be placed by the next one.
+        SyncLocalMouseCursorToPreviewMouseInventory();
+
+        _clientNetworkChannel.SendPacket(new ForgottenAdminsInventoryEditPacket
+        {
+            TargetPlayerUid = ForgottenAdminsData.PlayerUid,
+            Inventory = new ForgottenAdminsInventoryData
+            {
+                HotBar = ForgottenAdmins.ToPacket(HotBarInventory),
+                Backpack = ForgottenAdmins.ToPacket(BackpackInventory),
+                Crafting = ForgottenAdmins.ToPacket(CraftingInventory),
+                Character = ForgottenAdmins.ToPacket(CharacterInventory),
+                Mouse = ForgottenAdmins.ToPacket(MouseInventory)
+            }
+        });
+    }
+
+    private void SyncLocalMouseCursorToPreviewMouseInventory()
+    {
+        if (MouseInventory.Count <= 0) return;
+
+        try
+        {
+            var localMouseInventory = capi.World.Player?.InventoryManager
+                ?.GetOwnInventory(GlobalConstants.mousecursorInvClassName);
+
+            var localMouseStack = localMouseInventory != null && localMouseInventory.Count > 0
+                ? localMouseInventory[0].Itemstack
+                : null;
+
+            MouseInventory[0].Itemstack = localMouseStack?.Clone();
+            MouseInventory[0].MarkDirty();
+        }
+        catch
+        {
+            // If the local cursor inventory cannot be resolved for some reason, keep the
+            // previous preview mouse slot instead of throwing from a GUI click handler.
+        }
     }
 
     private static void OnSelectionChangeVoid(string code, bool selected)
@@ -977,7 +1090,7 @@ public class PlayerMenu : GuiDialog
         hunger?.SetNewTextAsync($"{ForgottenAdminsData?.Saturation} / {ForgottenAdminsData?.MaxSaturation}");
         if (ForgottenAdminsData?.ForgottenAdminsInventoryData?.Backpack?.Length != BackpackInventory.Count)
         {
-            BackpackInventory = new DummyInventory(capi, ForgottenAdminsData?.ForgottenAdminsInventoryData?.Backpack?.Length ?? 0);
+            BackpackInventory = CreateEditableInventory(capi, "backpack", ForgottenAdminsData?.ForgottenAdminsInventoryData?.Backpack?.Length ?? 0);
             SetupDialog();
         }
 
@@ -1060,6 +1173,15 @@ public class PlayerMenu : GuiDialog
                     UpdateClaimsMenu();
                 }
 
+                break;
+            }
+            case 3:
+            {
+                if (_updateOnceNeeded)
+                {
+                    _updateOnceNeeded = false;
+                    SetupDialog();
+                }
                 break;
             }
         }

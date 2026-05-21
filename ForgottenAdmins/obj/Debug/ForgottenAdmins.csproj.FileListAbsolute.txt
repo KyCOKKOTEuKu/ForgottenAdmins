@@ -1,0 +1,13 @@
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\bin\Debug\Mods\mod\modinfo.json
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\bin\Debug\Mods\mod\ForgottenAdmins.deps.json
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\bin\Debug\Mods\mod\ForgottenAdmins.dll
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\bin\Debug\Mods\mod\ForgottenAdmins.pdb
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\ForgottenAdmins.csproj.AssemblyReference.cache
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\ForgottenAdmins.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\ForgottenAdmins.AssemblyInfoInputs.cache
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\ForgottenAdmins.AssemblyInfo.cs
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\ForgottenAdmins.csproj.CoreCompileInputs.cache
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\ForgottenAdmins.dll
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\refint\ForgottenAdmins.dll
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\ForgottenAdmins.pdb
+C:\Users\wolki\OneDrive\Desktop\ForgottenAdmins-source-v1.4.4-inventory-cursor-fix\ForgottenAdmins\obj\Debug\ref\ForgottenAdmins.dll

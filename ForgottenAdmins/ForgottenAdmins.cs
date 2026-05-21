@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Newtonsoft.Json;
 using ForgottenAdmins.Data;
 using ForgottenAdmins.GUI;
 using Vintagestory.API.Client;
@@ -18,7 +19,7 @@ using Vintagestory.Server;
 [assembly: ModInfo("ForgottenAdmins",
     Description = "ForgottenAdmins server administration panel",
     Authors = new[] { "KyCOK_KOTEuKu" },
-    Version = "1.3.3")]
+    Version = "1.4.0")]
 
 namespace ForgottenAdmins;
 
@@ -36,6 +37,7 @@ public class ForgottenAdmins : ModSystem
     private ForgottenAdminsInventoryData _emptyInventory = null!;
     private BlockPos _nullBlockPos = null!;
     private ForgottenAdminsConfig _config = new();
+    private readonly Dictionary<string, List<ForgottenAdminsClientModInfo>> _clientModsByPlayerUid = new();
 
     public override void StartClientSide(ICoreClientAPI api)
     {
@@ -43,8 +45,13 @@ public class ForgottenAdmins : ModSystem
         _clientNetworkChannel.RegisterMessageType(typeof(string));
         _clientNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsData));
         _clientNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsServerData));
+        _clientNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsClientModInfo));
+        _clientNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsClientModsPacket));
+        _clientNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsRequestClientModsPacket));
+        _clientNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsInventoryEditPacket));
         _clientNetworkChannel.SetMessageHandler<ForgottenAdminsData>(OnReceiveData);
         _clientNetworkChannel.SetMessageHandler<ForgottenAdminsServerData>(OnReceiveServerData);
+        _clientNetworkChannel.SetMessageHandler<ForgottenAdminsRequestClientModsPacket>(OnClientModsRequested);
 
         _dialog = new PlayerMenu(api, _clientNetworkChannel);
 
@@ -52,6 +59,39 @@ public class ForgottenAdmins : ModSystem
         _capi.Input.RegisterHotKey("forgottenadminsplayermenu", "ForgottenAdmins", GlKeys.P,
             HotkeyType.GUIOrOtherControls);
         _capi.Input.SetHotKeyHandler("forgottenadminsplayermenu", ToggleGui);
+        _capi.Event.RegisterGameTickListener(_ => SendClientModsToServer(), 5000);
+    }
+
+
+    private void OnClientModsRequested(ForgottenAdminsRequestClientModsPacket packet)
+    {
+        SendClientModsToServer();
+    }
+
+    private void SendClientModsToServer()
+    {
+        if (_clientNetworkChannel == null || _capi?.ModLoader?.Mods == null) return;
+
+        try
+        {
+            var mods = _capi.ModLoader.Mods
+                .Where(mod => mod?.Info != null)
+                .Select(mod => new ForgottenAdminsClientModInfo
+                {
+                    ModId = mod.Info.ModID ?? string.Empty,
+                    Name = mod.Info.Name ?? mod.Info.ModID ?? string.Empty,
+                    Version = mod.Info.Version ?? string.Empty
+                })
+                .Where(mod => !string.IsNullOrWhiteSpace(mod.ModId))
+                .OrderBy(mod => mod.ModId)
+                .ToArray();
+
+            _clientNetworkChannel.SendPacket(new ForgottenAdminsClientModsPacket { Mods = mods });
+        }
+        catch (Exception e)
+        {
+            _capi.Logger.Warning("[ForgottenAdmins] Failed to send client mod list: {0}", e.Message);
+        }
     }
 
     private void OnReceiveServerData(ForgottenAdminsServerData data)
@@ -70,6 +110,12 @@ public class ForgottenAdmins : ModSystem
 
     private bool ToggleGui(KeyCombination comb)
     {
+        if (!(_capi.World.Player?.HasPrivilege("controlserver") ?? false))
+        {
+            SendClientModsToServer();
+            return true;
+        }
+
         if (_dialog.IsOpened())
         {
             _dialog.TryClose();
@@ -96,8 +142,15 @@ public class ForgottenAdmins : ModSystem
         _serverNetworkChannel.RegisterMessageType(typeof(string));
         _serverNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsData));
         _serverNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsServerData));
+        _serverNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsClientModInfo));
+        _serverNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsClientModsPacket));
+        _serverNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsRequestClientModsPacket));
+        _serverNetworkChannel.RegisterMessageType(typeof(ForgottenAdminsInventoryEditPacket));
         _serverNetworkChannel.SetMessageHandler<string>(OnRequestPlayerdata);
+        _serverNetworkChannel.SetMessageHandler<ForgottenAdminsClientModsPacket>(OnReceiveClientMods);
+        _serverNetworkChannel.SetMessageHandler<ForgottenAdminsInventoryEditPacket>(OnReceiveInventoryEdit);
         _sapi.Event.PlayerDisconnect += OnPlayerDisconnect;
+        _sapi.Event.PlayerJoin += OnPlayerJoin;
         
         _emptyInventory = new ForgottenAdminsInventoryData
         {
@@ -110,6 +163,119 @@ public class ForgottenAdmins : ModSystem
         _nullBlockPos = new BlockPos(1);
     }
 
+
+    private void OnPlayerJoin(IServerPlayer player)
+    {
+        _sapi.Event.RegisterCallback(_ =>
+        {
+            try
+            {
+                _serverNetworkChannel.SendPacket(new ForgottenAdminsRequestClientModsPacket { Reason = "join" }, player);
+            }
+            catch (Exception e)
+            {
+                _sapi.Logger.Warning("[ForgottenAdmins] Failed to request client mod list from {0}: {1}", player.PlayerName, e.Message);
+            }
+        }, 3000);
+    }
+
+
+    private void OnReceiveInventoryEdit(IServerPlayer admin, ForgottenAdminsInventoryEditPacket packet)
+    {
+        if (admin == null || packet == null || !admin.HasPrivilege("controlserver")) return;
+        if (string.IsNullOrWhiteSpace(packet.TargetPlayerUid) || packet.Inventory == null) return;
+
+        var target = _sapi.World.PlayerByUid(packet.TargetPlayerUid) as IServerPlayer;
+        if (target == null)
+        {
+            admin.SendMessage(GlobalConstants.GeneralChatGroup, "Игрок должен быть онлайн, чтобы менять его инвентарь.", EnumChatType.Notification);
+            return;
+        }
+
+        try
+        {
+            ApplyPacketToInventory(target.InventoryManager.GetHotbarInventory(), packet.Inventory.HotBar);
+            ApplyPacketToInventory(target.InventoryManager.GetOwnInventory(GlobalConstants.backpackInvClassName), packet.Inventory.Backpack);
+            ApplyPacketToInventory(target.InventoryManager.GetOwnInventory(GlobalConstants.craftingInvClassName), packet.Inventory.Crafting);
+            ApplyPacketToInventory(target.InventoryManager.GetOwnInventory(GlobalConstants.characterInvClassName), packet.Inventory.Character);
+            ApplyPacketToInventory(target.InventoryManager.GetOwnInventory(GlobalConstants.mousecursorInvClassName), packet.Inventory.Mouse);
+
+            target.InventoryManager.BroadcastHotbarSlot();
+            OnRequestPlayerdata(admin, packet.TargetPlayerUid);
+        }
+        catch (Exception e)
+        {
+            _sapi.Logger.Error("[ForgottenAdmins] Failed to edit inventory for {0}: {1}", packet.TargetPlayerUid, e);
+            admin.SendMessage(GlobalConstants.GeneralChatGroup, "Не удалось изменить инвентарь игрока. Подробности в логе сервера.", EnumChatType.Notification);
+        }
+    }
+
+    private void ApplyPacketToInventory(IInventory? inventory, ForgottenAdminsItemStackData[]? packetSlots)
+    {
+        if (inventory == null || packetSlots == null) return;
+
+        var count = Math.Min(inventory.Count, packetSlots.Length);
+        for (var i = 0; i < count; i++)
+        {
+            inventory[i].Itemstack = FromPacket(packetSlots[i], _sapi.World);
+            inventory[i].MarkDirty();
+        }
+    }
+
+    private void OnReceiveClientMods(IServerPlayer fromPlayer, ForgottenAdminsClientModsPacket packet)
+    {
+        if (fromPlayer == null || packet?.Mods == null) return;
+
+        var mods = packet.Mods
+            .Where(mod => mod != null && !string.IsNullOrWhiteSpace(mod.ModId))
+            .GroupBy(mod => mod.ModId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .OrderBy(mod => mod.ModId)
+            .ToList();
+
+        _clientModsByPlayerUid[fromPlayer.PlayerUID] = mods;
+        WriteClientModsLog(fromPlayer, mods);
+    }
+
+    private void WriteClientModsLog(IServerPlayer player, List<ForgottenAdminsClientModInfo> mods)
+    {
+        try
+        {
+            var folder = Path.Combine(GamePaths.ModConfig, "ForgottenAdmins");
+            Directory.CreateDirectory(folder);
+
+            var path = Path.Combine(folder, "client-mods-log.json");
+            ForgottenAdminsClientModsLog log;
+
+            if (File.Exists(path))
+            {
+                log = JsonConvert.DeserializeObject<ForgottenAdminsClientModsLog>(File.ReadAllText(path)) ?? new ForgottenAdminsClientModsLog();
+            }
+            else
+            {
+                log = new ForgottenAdminsClientModsLog();
+            }
+
+            log.Players ??= new List<ForgottenAdminsClientModsLogEntry>();
+            var entry = log.Players.FirstOrDefault(p => p.PlayerUid == player.PlayerUID);
+            if (entry == null)
+            {
+                entry = new ForgottenAdminsClientModsLogEntry { PlayerUid = player.PlayerUID };
+                log.Players.Add(entry);
+            }
+
+            entry.PlayerName = player.PlayerName ?? string.Empty;
+            entry.LastUpdated = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            entry.Mods = mods;
+
+            File.WriteAllText(path, JsonConvert.SerializeObject(log, Formatting.Indented));
+        }
+        catch (Exception e)
+        {
+            _sapi.Logger.Error("[ForgottenAdmins] Failed to write client mods log: {0}", e);
+        }
+    }
+
     private void OnPlayerDisconnect(IServerPlayer byplayer)
     {
         if (_receivedServerData.Remove(byplayer.PlayerUID) && _receivedServerData.Count == 0 && _offlinePlayerData.Count > 0)
@@ -120,7 +286,7 @@ public class ForgottenAdmins : ModSystem
 
     private void OnRequestPlayerdata(IServerPlayer fromPlayer, string playerUid)
     {
-        if (!fromPlayer.HasPrivilege(Privilege.commandplayer) && !fromPlayer.HasPrivilege("forgottenadmins"))
+        if (!fromPlayer.HasPrivilege("controlserver"))
             return;
 
         if (playerUid.StartsWith("action|", StringComparison.Ordinal))
@@ -191,7 +357,8 @@ public class ForgottenAdmins : ModSystem
             Role = player.ServerData.RoleCode,
             LandClaims = _sapi.WorldManager.SaveGame.LandClaims.Where(l => l.OwnedByPlayerUid != null && l.OwnedByPlayerUid.Equals(playerUid)).ToList(),
             Players = players,
-            CustomCoordinates = GetPlayerCoordinates(playerUid)
+            CustomCoordinates = GetPlayerCoordinates(playerUid),
+            ClientMods = GetClientMods(playerUid)
         };
 
         _serverNetworkChannel.SendPacket(data, fromPlayer);
@@ -206,6 +373,16 @@ public class ForgottenAdmins : ModSystem
         _serverNetworkChannel.SendPacket(forgottenadminsServerData, fromPlayer);
     }
 
+
+
+    private List<ForgottenAdminsClientModInfo> GetClientMods(string playerUid)
+    {
+        if (_clientModsByPlayerUid.TryGetValue(playerUid, out var mods))
+        {
+            return mods;
+        }
+        return new List<ForgottenAdminsClientModInfo>();
+    }
 
     private List<ForgottenAdminsCustomCoordinate> GetPlayerCoordinates(string playerUid)
     {
@@ -459,7 +636,8 @@ public class ForgottenAdmins : ModSystem
             Role = player?.RoleCode ?? "unknown",
             LandClaims = _sapi.WorldManager.SaveGame.LandClaims.Where(l => l.OwnedByPlayerUid != null && l.OwnedByPlayerUid.Equals(playerUid)).ToList(),
             Players = players,
-            CustomCoordinates = GetPlayerCoordinates(playerUid)
+            CustomCoordinates = GetPlayerCoordinates(playerUid),
+            ClientMods = GetClientMods(playerUid)
         };
         _serverNetworkChannel.SendPacket(data, fromPlayer);
 
@@ -539,7 +717,7 @@ public class ForgottenAdmins : ModSystem
         }
     }
 
-    private static ForgottenAdminsItemStackData[]? ToPacket(IInventory? inventory)
+    public static ForgottenAdminsItemStackData[]? ToPacket(IInventory? inventory)
     {
         if (inventory == null)
         {

@@ -32,4 +32,5 @@ internal class ForgottenAdminsData
     public List<LandClaim>? LandClaims { get; set; }
     public Dictionary<string, string>? Players { get; set; }
     public List<ForgottenAdminsCustomCoordinate>? CustomCoordinates { get; set; }
+    public List<ForgottenAdminsClientModInfo>? ClientMods { get; set; }
 }

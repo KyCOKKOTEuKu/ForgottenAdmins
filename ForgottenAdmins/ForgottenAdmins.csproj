@@ -23,6 +23,14 @@
             <HintPath>$(VintageStoryInstall)\Lib\protobuf-net.dll</HintPath>
             <Private>false</Private>
         </Reference>
+        <Reference Include="Newtonsoft.Json">
+            <HintPath>$(VintageStoryInstall)\Lib\Newtonsoft.Json.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="cairo-sharp">
+            <HintPath>$(VintageStoryInstall)\Lib\cairo-sharp.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
     </ItemGroup>
 
     <ItemGroup>
